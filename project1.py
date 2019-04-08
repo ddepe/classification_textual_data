@@ -103,5 +103,28 @@ Reduce the dimensionality of the data using the methods above:
 *   Apply LSI to the TF-IDF matrix corresponding to the 8 categories with k = 50; so each document is mapped to a 50-dimensional vector
 *   Also reduce dimensionality through NMF (k = 50) and compare with LSI:
   * Which one is larger, the
+
+### LSA/LSI
 """
 
+from sklearn.decomposition import TruncatedSVD
+
+svd = TruncatedSVD(n_components=50)
+W_train_reduced_lsa = svd.fit_transform(train_tfidf)
+print(W_train_reduced_lsa.shape)
+
+"""### NMF"""
+
+from sklearn.decomposition import NMF
+
+nmf = NMF(n_components=50)
+W_train_reduced_nmf = nmf.fit_transform(train_tfidf)
+print(W_train_reduced_nmf.shape)
+
+"""### Comparison between LSA/LSI and NMF"""
+
+# Calculate || X - W*H ||^2
+H_train_reduced_nmf = nmf.components_
+np.sum(np.array(train_tfidf - W_train_reduced_nmf.dot(H_train_reduced_nmf))**2)
+
+# Calculate || X - U_k * Sigma_k * (V_k)^T ||^2
