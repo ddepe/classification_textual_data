@@ -21,6 +21,7 @@ plt.bar(targets, counts, tick_label=ng_train.target_names)
 plt.xticks(rotation='vertical')
 plt.title('Number of Training Documents for each Class')
 plt.ylabel('Document Count')
+plt.tight_layout()
 plt.show()
 
 """## Question 2: Feature Extraction
