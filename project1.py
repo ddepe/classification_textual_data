@@ -91,41 +91,189 @@ vectorizer = text.CountVectorizer(min_df=3, analyzer=stem_remove_punc,
 train_counts = vectorizer.fit_transform(train_dataset.data)
 test_counts = vectorizer.transform(test_dataset.data)
 
-train_tfidf = tfidf_trans.fit_transform(train_counts)
-test_tfidf = tfidf_trans.transform(test_counts)
+X_train_tfidf = tfidf_trans.fit_transform(train_counts)
+X_test_tfidf = tfidf_trans.transform(test_counts)
 
 print('\nShape of TF-IDF matrices:')
-print('Train data set: ', train_tfidf.shape)
-print('Test data set: ', test_tfidf.shape)
+print('Train data set: ', X_train_tfidf.shape)
+print('Test data set: ', X_test_tfidf.shape)
 
 """## Question 3: Dimensionality Reduction
 
 Reduce the dimensionality of the data using the methods above:
 *   Apply LSI to the TF-IDF matrix corresponding to the 8 categories with k = 50; so each document is mapped to a 50-dimensional vector
 *   Also reduce dimensionality through NMF (k = 50) and compare with LSI:
-  * Which one is larger, the
+  * Which one is larger, the ...
 
 ### LSA/LSI
 """
 
 from sklearn.decomposition import TruncatedSVD
 
+# Based on the source code for TruncatedSVD, the return value corresponds to
+# X_transformed = U * sigma
+# VT can be obtained by calling .components_ on svd
 svd = TruncatedSVD(n_components=50)
-W_train_reduced_lsa = svd.fit_transform(train_tfidf)
-print(W_train_reduced_lsa.shape)
+X_transformed = svd.fit_transform(X_train_tfidf)
+print(X_transformed.shape)
 
 """### NMF"""
 
 from sklearn.decomposition import NMF
 
 nmf = NMF(n_components=50)
-W_train_reduced_nmf = nmf.fit_transform(train_tfidf)
+W_train_reduced_nmf = nmf.fit_transform(X_train_tfidf)
 print(W_train_reduced_nmf.shape)
 
 """### Comparison between LSA/LSI and NMF"""
 
-# Calculate || X - W*H ||^2
+# Calculate || X - W*H ||^2 for NMF
 H_train_reduced_nmf = nmf.components_
-np.sum(np.array(train_tfidf - W_train_reduced_nmf.dot(H_train_reduced_nmf))**2)
+np.sum(np.array(X_train_tfidf - W_train_reduced_nmf.dot(H_train_reduced_nmf))**2)
 
-# Calculate || X - U_k * Sigma_k * (V_k)^T ||^2
+# Calculate || X - U_k * Sigma_k * (V_k)^T ||^2 for LSA/LSI
+VT = svd.components_
+np.sum(np.array(X_train_tfidf - X_transformed.dot(VT))**2)
+
+"""## Question 4: SVM (My-Quan)
+
+## Question 5: Logistic Classifier (Chris)
+
+Train a logistic classifier without regularization (you may need to come up with some way to approximate this if you use sklearn.linear_model.LogisticRegression); plot the ROC curve and report the confusion matrix and calculate the accuracy, recall precision and F-1 score of this classifier.
+
+### Logistic Regression with No Penalty
+
+Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer, we can approximate this by setting the 'C' parameter to a very large number.
+"""
+
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational 
+# Activity' using floor division such that when target is less than 4, it 
+# becomes 0 and when it's between 4 and 7, it becomes 1
+vfunc = np.vectorize(lambda target: target // 4)
+y_train_dataset = vfunc(train_dataset.target)
+y_test_dataset = vfunc(test_dataset.target)
+
+
+# Logistic Regression
+from sklearn.linear_model import LogisticRegression
+
+# Instantiate classifier, learn parameters, and predict class for test dataset
+classifier = LogisticRegression(C=np.inf, solver='lbfgs')
+classifier.fit(X_train_tfidf, y_train_dataset)
+y_pred = classifier.predict(X_test_tfidf)
+y_score = classifier.predict_proba(X_test_tfidf)
+
+"""**Calculate ROC Curve**
+
+Use roc_curve from sklearn
+"""
+
+from sklearn.metrics import recall_score, roc_curve, auc
+
+# Calculate fpr and tpr
+fpr, tpr, _ = roc_curve(y_test_dataset, y_score[:,1])
+
+# Function to plot ROC curve
+def plot_roc(fpr, tpr):
+    fig, ax = plt.subplots()
+
+    roc_auc = auc(fpr,tpr)
+
+    ax.plot(fpr, tpr, lw=2, label= 'area under curve = %0.4f' % roc_auc)
+
+    ax.grid(color='0.7', linestyle='--', linewidth=1)
+
+    ax.set_xlim([-0.1, 1.1])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate',fontsize=15)
+    ax.set_ylabel('True Positive Rate',fontsize=15)
+
+    ax.legend(loc="lower right")
+
+    for label in ax.get_xticklabels()+ax.get_yticklabels():
+        label.set_fontsize(15)
+
+# Call function to plot ROC
+plot_roc(fpr, tpr)
+
+"""**Confusion Matrix**
+
+Code from https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+"""
+
+from sklearn.metrics import confusion_matrix
+from sklearn.utils.multiclass import unique_labels
+
+cm = confusion_matrix(y_test_dataset, y_pred)
+print('Confusion Matrix for Logistic Regression Classifier')
+print(cm)
+
+"""**Accuracy, Recall, Precision, and F-1 Score**"""
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import f1_score
+
+# Calculate accuracy
+print("Accuracy: {:.3f}".format(accuracy_score(y_test_dataset, y_pred)))
+print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
+print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
+print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
+
+"""### Logistic Regression with Regularization
+  * Using 5-fold cross-validation on the dimension-reduced-by-svd training data, find the best regularization strength in the range ... for logistic regression with L1 regularization and logistic regression L2 regularization, respectively.
+  * Compare the performance (accuracy, precision, recall and F-1 score) of 3 logistic classifiers: w/o regularization, w/ L1 regularization and w/ L2 regularization (with the best parameters you found from the part above), using test data.
+  * How does the regularization parameter affect the test error? How are the learnt coefficients affected? Why might one be interested in each type of regularization?
+  * Both logistic regression and linear SVM are trying to classify data points using a linear decision boundary, then what’s the difference between their ways to find this boundary? Why their performance differ?
+"""
+
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import GridSearchCV
+import math
+
+# Define parameter(s) to be used in the grid search
+parameters = {'C': [math.pow(10,k) for k in range(-3,4)]}
+
+# Create a grid search to find the best C value for L1 Penalty
+grid_clf_l1 = GridSearchCV(LogisticRegression(penalty='l1', solver='liblinear'), 
+                        parameters, cv=5)
+grid_clf_l1.fit(X_transformed, y_train_dataset)
+
+print("Best Inverse Regularization strength for L1 Penalty: ")
+print(grid_clf_l1.best_params_)
+
+# Create a grid search to find the best C value for L1 Penalty
+grid_clf_l2 = GridSearchCV(LogisticRegression(penalty='l2', solver='lbfgs', 
+                                           max_iter=200), parameters, cv=5)
+grid_clf_l2.fit(X_transformed, y_train_dataset)
+
+print("Best Inverse Regularization strength for L2 Penalty: ")
+print(grid_clf_l2.best_params_)
+
+"""* Compare the performance (accuracy, precision, recall and F-1 score) of 3 logistic classifiers: w/o regularization, w/ L1 regularization and w/ L2 regularization (with the best parameters you found from the part above), using test data."""
+
+# Performance of Logistic Regression with L1 penalty and C=10 on test data
+classifier = LogisticRegression(penalty='l1', C=10, solver='liblinear')
+classifier.fit(X_train_tfidf, y_train_dataset)
+y_pred = classifier.predict(X_test_tfidf)
+
+print("\nLogistic Regression with L1 Penalty and C=10")
+print("Accuracy: {:.3f}".format(accuracy_score(y_test_dataset, y_pred)))
+print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
+print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
+print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
+
+# Performance of Logistic Regression with L2 penalty and C=100 on test data
+classifier = LogisticRegression(penalty='l2', C=100, solver='lbfgs')
+classifier.fit(X_train_tfidf, y_train_dataset)
+y_pred = classifier.predict(X_test_tfidf)
+
+print("\nLogistic Regression with L2 Penalty and C=100")
+print("Accuracy: {:.3f}".format(accuracy_score(y_test_dataset, y_pred)))
+print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
+print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
+print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
+
+"""### Question 6: Naive Bayes (Danny)"""
