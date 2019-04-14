@@ -22,7 +22,7 @@ plt.xticks(rotation='vertical')
 plt.title('Number of Training Documents for each Class')
 plt.ylabel('Document Count')
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 """## Question 2: Feature Extraction
 
@@ -44,10 +44,10 @@ categories = ['comp.graphics', 'comp.os.ms-windows.misc',
               'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 
               'rec.autos', 'rec.motorcycles', 'rec.sport.baseball', 
               'rec.sport.hockey']
-train_dataset = fetch_20newsgroups(subset = 'train', categories = categories,
-                                   shuffle = True, random_state = None)
-test_dataset  = fetch_20newsgroups(subset = 'test', categories = categories,
-                                   shuffle = True, random_state = None)
+train_dataset = fetch_20newsgroups(subset='train', categories=categories,
+                                   shuffle=True, random_state=None)
+test_dataset = fetch_20newsgroups(subset='test', categories=categories,
+                                  shuffle=True, random_state=None)
 
 import nltk
 nltk.download('stopwords')
@@ -61,7 +61,7 @@ from string import punctuation
 stop_words_skt = text.ENGLISH_STOP_WORDS
 stop_words_eng = stopwords.words('english')
 combined_stopwords = set.union(set(stop_words_eng), set(punctuation), 
-                              set(stop_words_skt))
+                               set(stop_words_skt))
 
 from nltk import pos_tag
 
@@ -77,11 +77,11 @@ def penn2morphy(penntag):
 
 def lemmatize(list_word):
   return [wnl.lemmatize(word.lower(), pos=penn2morphy(tag))
-         for word, tag in pos_tag(list_word)]
+          for word, tag in pos_tag(list_word)]
 
 def stem_remove_punc(text):
   return (word for word in lemmatize(analyzer(text))
-         if word not in combined_stopwords and not word.isdigit())
+          if word not in combined_stopwords and not word.isdigit())
 
 analyzer = text.CountVectorizer().build_analyzer()
 tfidf_trans = text.TfidfTransformer()
@@ -146,8 +146,8 @@ Train a logistic classifier without regularization (you may need to come up with
 Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer, we can approximate this by setting the 'C' parameter to a very large number.
 """
 
-# Combine sub-classes of docs into 'Computer Technology' and 'Recreational 
-# Activity' using floor division such that when target is less than 4, it 
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational
+# Activity' using floor division such that when target is less than 4, it
 # becomes 0 and when it's between 4 and 7, it becomes 1
 vfunc = np.vectorize(lambda target: target // 4)
 y_train_dataset = vfunc(train_dataset.target)
@@ -237,7 +237,7 @@ import math
 parameters = {'C': [math.pow(10,k) for k in range(-3,4)]}
 
 # Create a grid search to find the best C value for L1 Penalty
-grid_clf_l1 = GridSearchCV(LogisticRegression(penalty='l1', solver='liblinear'), 
+grid_clf_l1 = GridSearchCV(LogisticRegression(penalty='l1', solver='liblinear'),
                         parameters, cv=5)
 grid_clf_l1.fit(X_transformed, y_train_dataset)
 
@@ -245,7 +245,7 @@ print("Best Inverse Regularization strength for L1 Penalty: ")
 print(grid_clf_l1.best_params_)
 
 # Create a grid search to find the best C value for L1 Penalty
-grid_clf_l2 = GridSearchCV(LogisticRegression(penalty='l2', solver='lbfgs', 
+grid_clf_l2 = GridSearchCV(LogisticRegression(penalty='l2', solver='lbfgs',
                                            max_iter=200), parameters, cv=5)
 grid_clf_l2.fit(X_transformed, y_train_dataset)
 
@@ -277,3 +277,54 @@ print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
 print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
 
 """### Question 6: Naive Bayes (Danny)"""
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational
+# Activity' using floor division such that when target is less than 4, it
+# becomes 0 and when it's between 4 and 7, it becomes 1
+vfunc = np.vectorize(lambda target: target // 4)
+y_train_dataset = vfunc(train_dataset.target)
+y_test_dataset = vfunc(test_dataset.target)
+
+from sklearn.naive_bayes import GaussianNB
+gnb = GaussianNB()
+gnb.fit(X_train_tfidf.toarray(), y_train_dataset)
+y_pred = gnb.predict(X_test_tfidf.toarray())
+y_score = gnb.predict_proba(X_test_tfidf.toarray())
+
+"""**Calculate ROC Curve**
+
+Use roc_curve from sklearn
+"""
+
+from sklearn.metrics import recall_score, roc_curve, auc
+
+# Calculate false positive rate and true positive rate
+fpr, tpr, _ = roc_curve(y_test_dataset, y_score[:,1])
+plt.show()
+
+# Call function to plot ROC
+plot_roc(fpr, tpr)
+
+"""**Confusion Matrix**
+
+Code from https://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+"""
+
+from sklearn.metrics import confusion_matrix
+
+cm = confusion_matrix(y_test_dataset, y_pred)
+print('Confusion Matrix for GaussianNB Classifier')
+print(cm)
+
+"""**Accuracy, Recall, Precision, and F-1 Score**"""
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import f1_score
+
+# Calculate accuracy
+print("Accuracy: {:.3f}".format(accuracy_score(y_test_dataset, y_pred)))
+print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
+print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
+print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
+
