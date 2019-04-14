@@ -135,7 +135,216 @@ np.sum(np.array(X_train_tfidf - W_train_reduced_nmf.dot(H_train_reduced_nmf))**2
 VT = svd.components_
 np.sum(np.array(X_train_tfidf - X_transformed.dot(VT))**2)
 
-"""## Question 4: SVM (My-Quan)
+"""## Question 4: SVM (My-Quan)"""
+
+### Train Hard Margin and Soft Margin SVM
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational 
+# Activity' using floor division such that when target is less than 4, it 
+# becomes 0 and when it's between 4 and 7, it becomes 1
+
+vfunc = np.vectorize(lambda target: target // 4)
+y_train_dataset = vfunc(train_dataset.target)
+y_test_dataset = vfunc(test_dataset.target)
+
+from sklearn.svm import SVC
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+tfidf_transformer = TfidfTransformer()
+
+from sklearn.base import BaseEstimator, TransformerMixin
+class SparseToDenseArray(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+
+    def transform(self, X, *_):
+        if hasattr(X, 'toarray'):
+            return X.toarray()
+        return X
+
+    def fit(self, *_):
+        return self
+
+# create Hard Margin and Soft Margin Pipeline
+from sklearn.pipeline import Pipeline
+Hpipeline = Pipeline([
+    ('vect', CountVectorizer(min_df=3, stop_words='english',analyzer=stem_remove_punc)),
+    ('tfidf', TfidfTransformer()),
+    ('reduce_dim', TruncatedSVD(n_components=50)),
+    ('toarr', SparseToDenseArray()),
+    ('clf', SVC(kernel='linear', C=1000)),
+])
+Spipeline = Pipeline([
+    ('vect', CountVectorizer(min_df=3, stop_words='english',analyzer=stem_remove_punc)),
+    ('tfidf', TfidfTransformer()),
+    ('reduce_dim', TruncatedSVD(n_components=50)),
+    ('toarr', SparseToDenseArray()),
+    ('clf', SVC(kernel='linear', C=0.0001)),
+])
+
+# ROC and fitting code
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
+
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+def plot_roc(fpr, tpr):
+    fig, ax = plt.subplots()
+
+    roc_auc = auc(fpr,tpr)
+
+    ax.plot(fpr, tpr, lw=2, label= 'area under curve = %0.4f' % roc_auc)
+
+    ax.grid(color='0.7', linestyle='--', linewidth=1)
+
+    ax.set_xlim([-0.1, 1.1])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate',fontsize=15)
+    ax.set_ylabel('True Positive Rate',fontsize=15)
+
+    ax.legend(loc="lower right")
+
+    for label in ax.get_xticklabels()+ax.get_yticklabels():
+        label.set_fontsize(15)
+
+def fit_predict_and_plot_roc(pipe, train_data, train_label, test_data, test_label):
+    pipe.fit(train_data, train_label)
+    # pipeline1.predict(twenty_test.data)
+
+    if hasattr(pipe, 'decision_function'):
+        prob_score = pipe.decision_function(test_data)
+        fpr, tpr, _ = roc_curve(test_label, prob_score)
+    else:
+        prob_score = pipe.predict_proba(test_data)
+        fpr, tpr, _ = roc_curve(test_label, prob_score[:,1])
+
+    plot_roc(fpr, tpr)
+
+### Hard Margin ROC Plot
+fit_predict_and_plot_roc(Hpipeline, train_dataset.data, y_train_dataset, test_dataset.data, y_test_dataset)
+
+### Soft Margin ROC Plot
+fit_predict_and_plot_roc(Spipeline, train_dataset.data, y_train_dataset, test_dataset.data, y_test_dataset)
+
+### Hard/Soft Margin Confusion Matrix, Accuracy, Recall, Precision, and F1 Score
+from sklearn.metrics import confusion_matrix
+
+# predict class for test dataset
+Hpredict = Hpipeline.predict(test_dataset.data)
+Spredict = Spipeline.predict(test_dataset.data)
+
+# compute confusion matrix
+HconfMatrix = confusion_matrix(y_test_dataset, Hpredict)
+SconfMatrix = confusion_matrix(y_test_dataset, Spredict)
+
+#------------------------------------------------------------------------------#
+
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import f1_score
+
+# Hard Margin Confusion Matrix/Scores
+print('HARD MARGIN SVM CLASSIFIER')
+print('-'*25)
+print('\nHard Margin Confusion Matrix:')
+print(HconfMatrix)
+
+# Hard Margin Scores
+print('\nHard Margin Scores')
+print("%-12s %f" % ('- Accuracy:', accuracy_score(y_test_dataset, Hpredict)))
+print("%-12s %f" % ('- Recall:', recall_score(y_test_dataset, Hpredict)))
+print("%-12s %f" % ('- Precision:', precision_score(y_test_dataset, Hpredict)))
+print("%-12s %f" % ('- F-1:', f1_score(y_test_dataset, Hpredict)))
+
+# Soft Margin Confusion Matrix/Scores
+print('\n\nSOFT MARGIN SVM CLASSIFIER')
+print('-'*25)
+print('\nSoft Margin Confusion Matrix:')
+print(SconfMatrix)
+
+# Soft Margin Scores
+print('\nSoft Margin Scores')
+print("%-12s %f" % ('- Accuracy:', accuracy_score(y_test_dataset, Spredict)))
+print("%-12s %f" % ('- Recall:', recall_score(y_test_dataset, Spredict)))
+print("%-12s %f" % ('- Precision:', precision_score(y_test_dataset, Spredict)))
+print("%-12s %f" % ('- F-1:', f1_score(y_test_dataset, Spredict)))
+
+### Using Cross Validation to Choose Optimal Gamma
+from sklearn.svm import LinearSVC
+from sklearn.model_selection import GridSearchCV
+import math
+
+# used to cache results
+from tempfile import mkdtemp
+from shutil import rmtree
+from sklearn.externals.joblib import Memory
+# print(__doc__)
+cachedir = mkdtemp()
+memory = Memory(cachedir=cachedir, verbose=10)
+
+Tpipeline = Pipeline([
+    ('vect', CountVectorizer(min_df=3, stop_words='english',analyzer=stem_remove_punc)),
+    ('tfidf', TfidfTransformer()),
+    ('reduce_dim', TruncatedSVD(n_components=50)),
+    ('toarr', SparseToDenseArray()),
+    ('clf', SVC(kernel='linear', C=1000)),
+],
+memory=memory
+)
+
+# Gamma test set: {10^k | -3 <= k <= 3, k in Z}
+#C_OPTIONS = {'C': [math.pow(10, k) for k in range(-3,3)]}
+
+param_grid = [
+    {
+        'clf__C': [math.pow(10, k) for k in range(-3,3)]
+    }
+]
+
+grid = GridSearchCV(Tpipeline, cv=5, n_jobs=1, param_grid=param_grid, scoring='accuracy')
+grid.fit(train_dataset.data, y_train_dataset)
+
+print("Best Parameters: ")
+print(grid.best_params_)
+rmtree(cachedir)
+
+### Optimal Margin SVM
+Optpipeline = Pipeline([
+    ('vect', CountVectorizer(min_df=3, stop_words='english',analyzer=stem_remove_punc)),
+    ('tfidf', TfidfTransformer()),
+    ('reduce_dim', TruncatedSVD(n_components=50)),
+    ('toarr', SparseToDenseArray()),
+    ('clf', SVC(kernel='linear', C=100)),
+])
+
+### Optimal Margin ROC
+fit_predict_and_plot_roc(Optpipeline, train_dataset.data, y_train_dataset, test_dataset.data, y_test_dataset)
+
+### Optimal Confusion Matrix, Accuracy, Recall, Precision, and F1 Score
+# predict class for test dataset
+Optpredict = Optpipeline.predict(test_dataset.data)
+
+# compute confusion matrix
+OptconfMatrix = confusion_matrix(y_test_dataset, Optpredict)
+
+# Optimal Confusion Matrix/Scores
+print('OPTIMAL SVM CLASSIFIER')
+print('-'*25)
+print('\nOptimal Confusion Matrix:')
+print(OptconfMatrix)
+
+# Optimal Margin Scores
+print('\nOptimal Scores')
+print("%-12s %f" % ('- Accuracy:', accuracy_score(y_test_dataset, Optpredict)))
+print("%-12s %f" % ('- Recall:', recall_score(y_test_dataset, Optpredict)))
+print("%-12s %f" % ('- Precision:', precision_score(y_test_dataset, Optpredict)))
+print("%-12s %f" % ('- F-1:', f1_score(y_test_dataset, Optpredict)))
+
 
 ## Question 5: Logistic Classifier (Chris)
 
