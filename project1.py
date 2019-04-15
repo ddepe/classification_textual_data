@@ -537,3 +537,72 @@ print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
 print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
 print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
 
+"""
+Question 8
+"""
+from sklearn.svm import SVC
+from sklearn.multiclass import OneVsOneClassifier, OneVsRestClassifier
+
+def print_pred_info(y_true, y_pred):
+  print(f"Accuracy: {accuracy_score(y_true, y_pred):.3f}")
+  print(f"Recall: {recall_score(y_true, y_pred, average='weighted'):.3f}")
+  print(f"Precision: {precision_score(y_true, y_pred, average='weighted'):.3f}")
+  print(f"F-1 Score: {f1_score(y_true, y_pred, average='weighted') :.3f}")
+  print('Confusion Matrix:')
+  print(confusion_matrix(y_true, y_pred))
+
+categories = ['comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', \
+              'misc.forsale', 'soc.religion.christian']
+train_dataset = fetch_20newsgroups(subset = 'train', categories = categories, \
+                                   shuffle = True, random_state = None)
+test_dataset = fetch_20newsgroups(subset = 'test', categories = categories, \
+                                  shuffle = True, random_state = None)
+
+analyzer = text.CountVectorizer().build_analyzer()
+tfidf_trans = text.TfidfTransformer()
+
+vectorizer = text.CountVectorizer(min_df=3, analyzer=stem_remove_punc,
+                                  stop_words='english')
+train_counts = vectorizer.fit_transform(train_dataset.data)
+test_counts = vectorizer.transform(test_dataset.data)
+
+X_train_tfidf = tfidf_trans.fit_transform(train_counts)
+X_test_tfidf = tfidf_trans.transform(test_counts)
+
+svd = TruncatedSVD(n_components=50)
+X_train = svd.fit_transform(X_train_tfidf)
+y_train = train_dataset.target
+
+X_test = svd.transform(X_test_tfidf) 
+y_test = test_dataset.target 
+
+# One Vs One 
+svm_ovo = OneVsOneClassifier(SVC(kernel='linear')).fit(X_train, y_train)
+ovo_train_pred = svm_ovo.predict(X_train)
+ovo_test_pred = svm_ovo.predict(X_test)
+print("SVM One Vs One Multiclass Classifier")
+print("--- train dataset ---")
+print_pred_info(y_train, ovo_train_pred)
+print("--- test dataset ---")
+print_pred_info(y_test, ovo_test_pred)
+
+# One Vs Rest
+svm_ovr = OneVsRestClassifier(SVC(kernel='linear')).fit(X_train, y_train)
+ovr_train_pred = svm_ovr.predict(X_train)
+ovr_test_pred = svm_ovr.predict(X_test)
+print("SVM One Vs Rest Multiclass Classifier")
+print("--- train dataset ---")
+print_pred_info(y_train, ovr_train_pred)
+print("--- test dataset ---")
+print_pred_info(y_test, ovr_test_pred)
+
+gnb = GaussianNB() 
+gnb.fit(X_train, y_train)
+gnb_train_pred = gnb.predict(X_train)
+gnb_test_pred = gnb.predict(X_test)
+
+print("Naive Bayes Multiclass Classifier")
+print("--- train dataset ---")
+print_pred_info(y_train, gnb_train_pred)
+print("--- test dataset ---")
+print_pred_info(y_test, gnb_test_pred)
