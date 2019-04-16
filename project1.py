@@ -22,7 +22,7 @@ plt.xticks(rotation='vertical')
 plt.title('Number of Training Documents for each Class')
 plt.ylabel('Document Count')
 plt.tight_layout()
-# plt.show()
+plt.show(0)
 
 """## Question 2: Feature Extraction
 
@@ -190,7 +190,6 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import auc
 
 import matplotlib.pyplot as plt
-%matplotlib inline
 
 def plot_roc(fpr, tpr):
     fig, ax = plt.subplots()
@@ -348,16 +347,14 @@ print("%-12s %f" % ('- F-1:', f1_score(y_test_dataset, Optpredict)))
 
 ## Question 5: Logistic Classifier (Chris)
 
-Train a logistic classifier without regularization (you may need to come up with some way to approximate this if you use sklearn.linear_model.LogisticRegression); plot the ROC curve and report the confusion matrix and calculate the accuracy, recall precision and F-1 score of this classifier.
+#Train a logistic classifier without regularization (you may need to come up with some way to approximate this if you use sklearn.linear_model.LogisticRegression); plot the ROC curve and report the confusion matrix and calculate the accuracy, recall precision and F-1 score of this classifier.
 
 ### Logistic Regression with No Penalty
-
-Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer, we can approximate this by setting the 'C' parameter to a very large number.
-"""
-
+# Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer, we can approximate this by setting the 'C' parameter to a very large number.
 # Combine sub-classes of docs into 'Computer Technology' and 'Recreational
 # Activity' using floor division such that when target is less than 4, it
 # becomes 0 and when it's between 4 and 7, it becomes 1
+
 vfunc = np.vectorize(lambda target: target // 4)
 y_train_dataset = vfunc(train_dataset.target)
 y_test_dataset = vfunc(test_dataset.target)
@@ -536,6 +533,88 @@ print("Accuracy: {:.3f}".format(accuracy_score(y_test_dataset, y_pred)))
 print("Recall: {:.3f}".format(recall_score(y_test_dataset, y_pred)))
 print("Precision: {:.3f}".format(precision_score(y_test_dataset, y_pred)))
 print("F-1 Score: {:.3f}".format(f1_score(y_test_dataset, y_pred)))
+
+"""
+Question 7
+"""
+from sklearn.pipeline import Pipeline
+from IPython.display import display
+
+# used to cache results
+from tempfile import mkdtemp
+from shutil import rmtree
+from sklearn.externals.joblib import Memory
+import pandas as pd
+from sklearn.svm import SVC
+from sklearn.naive_bayes import GaussianNB
+from sklearn.base import BaseEstimator, TransformerMixin
+
+class SparseToDenseArray(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        pass
+
+    def transform(self, X, *_):
+        if hasattr(X, 'toarray'):
+            return X.toarray()
+        return X
+
+    def fit(self, *_):
+        return self
+
+cachedir = mkdtemp()
+memory = Memory(location=cachedir, verbose=10)
+
+categories = ['comp.graphics', 'comp.os.ms-windows.misc', 
+              'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 
+              'rec.autos', 'rec.motorcycles', 'rec.sport.baseball', 
+              'rec.sport.hockey']
+train_set = fetch_20newsgroups(subset='train', remove=('headers', 'footers'),
+                              categories=categories)
+test_set = fetch_20newsgroups(subset='train', remove=('headers', 'footers'),
+                             categories=categories)
+
+pipeline = Pipeline([
+    ('vect', text.CountVectorizer(min_df=3, stop_words='english')),
+    ('tfidf', text.TfidfTransformer()),
+    ('reduce_dim', TruncatedSVD()),
+    ('clf', SVC())
+    ]
+    ,
+    memory=memory
+)
+
+param_grid = [
+    {
+        'vect__min_df': [3, 5],
+        'vect__analyzer': ['word', stem_remove_punc],
+        'reduce_dim': [TruncatedSVD(n_components=50), NMF(n_components=50)],
+        'clf': [SVC(C=100, kernel='linear'), 
+                LogisticRegression(penalty='l1', C=10, solver='liblinear'),
+                LogisticRegression(penalty='l2', C=100, solver='lbfgs')]
+    },
+    {
+        'vect__min_df': [3, 5],
+        'vect__analyzer': ['word', stem_remove_punc],
+        'reduce_dim': [TruncatedSVD(n_components=50), NMF(n_components=50)],
+        'clf': [GaussianNB()]
+    }
+]
+
+grid = GridSearchCV(pipeline, cv=5, n_jobs=1, param_grid=param_grid, 
+                    scoring='accuracy')
+
+# Training data without headers and footers
+grid.fit(train_set.data, y_train_dataset)
+result1 = pd.DataFrame(grid.cv_results_)
+print("Grid Search Best Score Clf (w/o headers & footers):")
+display(result1[result1['rank_test_score'] == 1)
+
+# Training data with headers and footers
+grid.fit(train_dataset.data, y_train_dataset)
+result2 = pd.DataFrame(grid.cv_results_)
+print("Grid Search Best Score Clf (w headers & footers):")
+display(result2[result2['rank_test_score'] == 1)
+rmtree(cachedir)
 
 """
 Question 8
