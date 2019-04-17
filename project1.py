@@ -138,8 +138,8 @@ np.sum(np.array(X_train_tfidf - X_transformed_train.dot(VT))**2)
 """## Question 4: SVM (My-Quan)"""
 
 ### Train Hard Margin and Soft Margin SVM
-# Combine sub-classes of docs into 'Computer Technology' and 'Recreational 
-# Activity' using floor division such that when target is less than 4, it 
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational
+# Activity' using floor division such that when target is less than 4, it
 # becomes 0 and when it's between 4 and 7, it becomes 1
 
 vfunc = np.vectorize(lambda target: target // 4)
@@ -340,10 +340,10 @@ print("%-12s %f" % ('- F-1:', f1_score(y_test_dataset, Optpredict)))
 
 """ Question 5: Logistic Classifier (Chris)"""
 ### Logistic Regression with No Penalty
-# Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer, 
+# Since sklearn's implementation of logistic regression does not give us the option of not using a regularizer,
 # we can approximate this by setting the 'C' parameter to a very large number.
 
-# Combine sub-classes of docs into 'Computer Technology' and 'Recreational Activity' using floor division such 
+# Combine sub-classes of docs into 'Computer Technology' and 'Recreational Activity' using floor division such
 # that when target is less than 4, it becomes 0 and when it's between 4 and 7, it becomes 1
 vfunc = np.vectorize(lambda target: target // 4)
 y_train_dataset = vfunc(train_dataset.target)
@@ -439,9 +439,9 @@ y_test_dataset = vfunc(test_dataset.target)
 
 from sklearn.naive_bayes import GaussianNB
 gnb = GaussianNB()
-gnb.fit(X_train_tfidf.toarray(), y_train_dataset)
-y_pred = gnb.predict(X_test_tfidf.toarray())
-y_score = gnb.predict_proba(X_test_tfidf.toarray())
+gnb.fit(X_transformed_train, y_train_dataset)
+y_pred = gnb.predict(X_transformed_test)
+y_score = gnb.predict_proba(X_transformed_test)
 
 """**Calculate ROC Curve**
 
@@ -499,9 +499,9 @@ from sklearn.base import BaseEstimator, TransformerMixin
 cachedir = mkdtemp()
 memory = Memory(location=cachedir, verbose=0)
 
-categories = ['comp.graphics', 'comp.os.ms-windows.misc', 
-              'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware', 
-              'rec.autos', 'rec.motorcycles', 'rec.sport.baseball', 
+categories = ['comp.graphics', 'comp.os.ms-windows.misc',
+              'comp.sys.ibm.pc.hardware', 'comp.sys.mac.hardware',
+              'rec.autos', 'rec.motorcycles', 'rec.sport.baseball',
               'rec.sport.hockey']
 train_set = fetch_20newsgroups(subset='train', remove=('headers', 'footers'),
                               categories=categories)
@@ -521,7 +521,7 @@ param_grid = [
         'vect__min_df': [3, 5],
         'vect__analyzer': ['word', stem_remove_punc],
         'reduce_dim': [TruncatedSVD(n_components=50), NMF(n_components=50)],
-        'clf': [SVC(C=100, kernel='linear'), 
+        'clf': [SVC(C=100, kernel='linear'),
                 LogisticRegression(penalty='l1', C=10, solver='liblinear'),
                 LogisticRegression(penalty='l2', C=100, solver='lbfgs')]
     },
@@ -533,7 +533,7 @@ param_grid = [
     }
 ]
 
-grid = GridSearchCV(pipeline, cv=5, n_jobs=1, param_grid=param_grid, 
+grid = GridSearchCV(pipeline, cv=5, n_jobs=1, param_grid=param_grid,
                     scoring='accuracy')
 
 # Training data without headers and footers
@@ -585,10 +585,10 @@ svd = TruncatedSVD(n_components=50)
 X_train = svd.fit_transform(X_train_tfidf)
 y_train = train_dataset.target
 
-X_test = svd.transform(X_test_tfidf) 
-y_test = test_dataset.target 
+X_test = svd.transform(X_test_tfidf)
+y_test = test_dataset.target
 
-# One Vs One 
+# One Vs One
 svm_ovo = OneVsOneClassifier(SVC(kernel='linear')).fit(X_train, y_train)
 ovo_train_pred = svm_ovo.predict(X_train)
 ovo_test_pred = svm_ovo.predict(X_test)
@@ -608,7 +608,7 @@ print_pred_info(y_train, ovr_train_pred)
 print("--- test dataset ---")
 print_pred_info(y_test, ovr_test_pred)
 
-gnb = GaussianNB() 
+gnb = GaussianNB()
 gnb.fit(X_train, y_train)
 gnb_train_pred = gnb.predict(X_train)
 gnb_test_pred = gnb.predict(X_test)
