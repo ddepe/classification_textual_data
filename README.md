@@ -1,4 +1,4 @@
-#20 Newsgroups Text Dataset Binary and Multi-Class Classification
+# 20 Newsgroups Text Dataset Binary and Multi-Class Classification
 
 For Binary Classification, Linear SVM, Logistic Regression and Gaussian Naive Bayes were performed
 
